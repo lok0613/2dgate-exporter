@@ -4,4 +4,5 @@ source "https://rubygems.org"
 
 gem 'nokogiri'
 
-gem 'therubyracer'
+gem 'libv8'
+gem "therubyracer", '>= 0.11.0beta1', :require => 'v8'

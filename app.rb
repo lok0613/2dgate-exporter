@@ -3,10 +3,12 @@ require 'open-uri'
 require 'v8'
 require 'net/http'
 require 'fileutils'
+require 'yaml'
 
 url = ARGV[0]
 
 topics = {}
+@threads = []
 
 @doc = Nokogiri::HTML(open(url))
 mainSection = @doc.css(".t_f").first
@@ -34,23 +36,42 @@ def getVideos(mainSection, topics)
 			filesJson = /(?:sources:)(.*)(?:,tracks:)/.match(decompiledJsCode)[1]
 			files = eval(filesJson)
 			videoUrl = files.last[:file]
-			download(videoUrl, topic)
+			@threads << download(videoUrl, topic)
+		end
+	end
+	@threads.each(&:join)
+end
+
+def download(url, name)
+	Thread.new do
+		puts "Downloading #{name}..."
+		FileUtils::mkdir_p "#{@config.getDownloadPath}/#{getCollectionName}"
+		open("#{@config.getDownloadPath}/#{getCollectionName}/#{name}", 'wb') do |file|
+			file << open(url).read
+			puts "#{name} Done."
 		end
 	end
 end
 
-def download(url, name)
-	puts "Downloading #{name}..."
-	FileUtils::mkdir_p "collections/#{getCollectionName}"
-	open("collections/#{getCollectionName}/#{name}.mp4", 'wb') do |file|
-		file << open(url).read
-		puts "Done."
+def getCollectionName
+	@collectionName ||= @doc.css(".album h1").text.gsub('/', ' ')
+end
+
+class Config
+	def initialize(configFile)
+		@config = YAML.load_file(configFile)
+	end
+
+	def getDownloadPath
+		@config['downloadPath']
+	end
+
+	def getMaxThread
+		@config['maxThread']
 	end
 end
 
-def getCollectionName()
-	@collectionName ||= @doc.css(".album h1").text
-end
+@config = Config.new('config.yml')
 
 topics = getTopics(mainSection)
 getVideos(mainSection, topics)
